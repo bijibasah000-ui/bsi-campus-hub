@@ -1,4 +1,4 @@
-FROM php:8.3-apache
+FROM php:8.3-cli
 
 RUN apt-get update && apt-get install -y \
     git curl zip unzip libzip-dev libpng-dev libxml2-dev libonig-dev \
@@ -17,14 +17,9 @@ COPY . .
 RUN composer install --no-dev --optimize-autoloader
 RUN npm install && npm run build
 
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
-RUN a2dismod mpm_event mpm_worker 2>/dev/null || true \
-    && a2enmod mpm_prefork rewrite
+EXPOSE 8000
 
-COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
-
-EXPOSE 80
-
-CMD ["apache2-foreground"]
+CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
