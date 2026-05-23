@@ -22,7 +22,8 @@ class KonselingController extends Controller
 
         $apiKey = config('services.groq.key');
 
-        if (!$apiKey || $apiKey === 'YOUR_GROQ_API_KEY_HERE') {
+        if (!$apiKey || $apiKey === 'YOUR_GROQ_API_KEY_HERE' || empty(trim($apiKey))) {
+            Log::error('GROQ_API_KEY kosong atau belum diset');
             return response()->json([
                 'reply' => 'Konfigurasi API Key belum diset. Periksa file .env kamu. 🙏'
             ]);
@@ -63,6 +64,8 @@ class KonselingController extends Controller
         ];
 
         try {
+            Log::info('Mencoba koneksi ke Groq API...');
+
             $response = Http::withoutVerifying()
                 ->timeout(30)
                 ->withHeaders([
@@ -76,6 +79,8 @@ class KonselingController extends Controller
                     'max_tokens'  => 600,
                 ]);
 
+            Log::info('Groq response status: ' . $response->status());
+
             if ($response->failed()) {
                 $errorData = $response->json();
                 Log::error('Groq API Error:', ['status' => $response->status(), 'body' => $errorData]);
@@ -86,8 +91,14 @@ class KonselingController extends Controller
                     ]);
                 }
 
+                if ($response->status() === 401) {
+                    return response()->json([
+                        'reply' => 'API Key tidak valid. Periksa GROQ_API_KEY di Railway Variables. 🙏'
+                    ]);
+                }
+
                 return response()->json([
-                    'reply' => 'Maaf, koneksi ke Kak Sari terputus. Silakan coba beberapa saat lagi. 😊'
+                    'reply' => 'Maaf, koneksi ke Kak Sari terputus (status: ' . $response->status() . '). Silakan coba beberapa saat lagi. 😊'
                 ]);
             }
 
@@ -97,10 +108,15 @@ class KonselingController extends Controller
 
             return response()->json(['reply' => $reply]);
 
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('Groq Connection Error: ' . $e->getMessage());
+            return response()->json([
+                'reply' => 'Tidak bisa terhubung ke server AI (connection refused). Kemungkinan diblokir. Error: ' . $e->getMessage()
+            ], 500);
         } catch (\Exception $e) {
             Log::error('Groq Exception: ' . $e->getMessage());
             return response()->json([
-                'reply' => 'Terjadi kendala teknis. Mohon tunggu sebentar ya. 🙏'
+                'reply' => 'Terjadi kendala teknis: ' . $e->getMessage()
             ], 500);
         }
     }
