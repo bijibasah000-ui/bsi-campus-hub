@@ -17,7 +17,12 @@ COPY . .
 RUN composer install --no-dev --optimize-autoloader
 RUN npm install && npm run build
 
-RUN chown -R www-data:www-data storage bootstrap/cache \
+RUN mkdir -p storage/framework/sessions \
+        storage/framework/cache/data \
+        storage/framework/views \
+        storage/logs \
+        bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 8000
