@@ -1291,3 +1291,125 @@ hr.divider {
     padding: 0;
     font-size: 0;
 }
+
+/* ============================================================
+   RESPONSIVE — MOBILE (max 768px)
+   ============================================================ */
+@media (max-width: 768px) {
+    /* Body bisa scroll di mobile */
+    body {
+        overflow: auto;
+        height: auto;
+    }
+
+    .app-wrapper {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+    }
+
+    /* Sembunyikan sidebar desktop, pakai bottom nav */
+    .sidebar {
+        display: none !important;
+    }
+
+    /* Topbar mobile */
+    .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        width: 100%;
+        padding: 0 16px;
+    }
+
+    /* Konten utama full width */
+    .page-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding: 16px !important;
+        overflow: auto;
+        height: auto;
+    }
+
+    /* Grid 2 kolom jadi 1 kolom */
+    .grid-2,
+    .two-col,
+    [class*="grid-cols-2"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Card padding lebih kecil */
+    .card,
+    [class*="card"] {
+        padding: 14px !important;
+    }
+
+    /* Tabel bisa scroll horizontal */
+    table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    /* Bottom navigation bar */
+    .bottom-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--surface, #fff);
+        border-top: 1px solid var(--border, #e5e7eb);
+        z-index: 200;
+        padding: 8px 0;
+        justify-content: space-around;
+    }
+
+    /* Tambah padding bawah agar konten tidak tertutup bottom nav */
+    .page-content {
+        padding-bottom: 80px !important;
+    }
+
+    /* Font sedikit lebih kecil */
+    body {
+        font-size: 14px;
+    }
+
+    /* Tombol dan input full width */
+    .btn-full-mobile {
+        width: 100%;
+    }
+
+    /* Carousel/banner mobile */
+    .carousel-nav,
+    .event-carousel {
+        max-width: 100% !important;
+    }
+}
+
+/* ============================================================
+   RESPONSIVE — TABLET (768px - 1024px)
+   ============================================================ */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .sidebar {
+        width: 66px !important;
+        min-width: 66px !important;
+    }
+
+    .sidebar .prof-info,
+    .sidebar .mi-label,
+    .sidebar .sec-lbl,
+    .sidebar .logo-text {
+        display: none !important;
+    }
+
+    .page-content {
+        margin-left: 66px !important;
+    }
+}
+
+/* Bottom nav hidden by default (desktop) */
+.bottom-nav {
+    display: none;
+}
