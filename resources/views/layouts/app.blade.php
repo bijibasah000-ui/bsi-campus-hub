@@ -183,6 +183,30 @@
     </div>
 </div>
 
+{{-- ===== BOTTOM NAV mobile ===== --}}
+<nav class="bottom-nav">
+    <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Home
+    </a>
+    <a href="{{ Auth::check() ? route('course.index') : route('login') }}" class="{{ request()->routeIs('course.*') ? 'active' : '' }}">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Materi
+    </a>
+    <a href="{{ Auth::check() ? route('konseling.index') : route('login') }}" class="{{ request()->routeIs('konseling.*') ? 'active' : '' }}">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Konseling
+    </a>
+    <a href="{{ Auth::check() ? route('pojok.index') : route('login') }}" class="{{ request()->routeIs('pojok.*') ? 'active' : '' }}">
+        <svg viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+        Pojok
+    </a>
+    <a href="{{ Auth::check() ? route('profile') : route('login') }}" class="{{ request()->routeIs('profile') ? 'active' : '' }}">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        Profil
+    </a>
+</nav>
+
 {{-- Tutup dropdown jika klik di luar --}}
 <script>
 document.addEventListener('click', function(e) {

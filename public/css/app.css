@@ -1413,3 +1413,143 @@ hr.divider {
 .bottom-nav {
     display: none;
 }
+
+/* ============================================================
+   RESPONSIVE — TABLET (769px - 1024px)
+   ============================================================ */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .sidebar {
+        width: 66px !important;
+        min-width: 66px !important;
+    }
+    .sidebar .prof-info,
+    .sidebar .mi-label,
+    .sidebar .sec-lbl,
+    .sidebar .logo-text,
+    .sidebar .logo-wrap,
+    .sidebar .prof-sec {
+        display: none !important;
+    }
+    .page-content {
+        padding: 20px !important;
+    }
+}
+
+/* ============================================================
+   RESPONSIVE — MOBILE (max 768px)
+   ============================================================ */
+@media (max-width: 768px) {
+
+    body {
+        overflow: auto;
+        height: auto;
+        font-size: 14px;
+    }
+
+    .app-wrapper {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+    }
+
+    /* Sembunyikan sidebar — navigasi pakai bottom nav */
+    .sidebar {
+        display: none !important;
+    }
+
+    /* Topbar mobile */
+    .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        width: 100%;
+        padding: 0 12px;
+        box-sizing: border-box;
+    }
+
+    /* Konten utama full width */
+    .page-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 14px 14px 90px 14px !important;
+        box-sizing: border-box;
+        overflow: visible;
+        height: auto !important;
+        min-height: calc(100vh - 66px);
+    }
+
+    /* main-area full width */
+    .main-area {
+        width: 100% !important;
+        overflow: visible !important;
+        height: auto !important;
+    }
+
+    /* Grid 2 kolom jadi 1 kolom */
+    .dash-grid,
+    .two-col,
+    [class*="grid-2"] {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    /* Tabel bisa scroll horizontal */
+    table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Card */
+    .card { padding: 14px !important; }
+
+    /* ── BOTTOM NAVIGATION BAR ── */
+    .bottom-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--surface, #ffffff);
+        border-top: 1.5px solid var(--border, #e5e7eb);
+        z-index: 300;
+        padding: 6px 0 8px;
+        justify-content: space-around;
+        align-items: center;
+        box-shadow: 0 -2px 12px rgba(0,0,0,.08);
+    }
+
+    .bottom-nav a {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        font-size: 10px;
+        color: var(--text-muted, #6b7280);
+        text-decoration: none;
+        padding: 4px 8px;
+        border-radius: 8px;
+        transition: color .2s;
+        min-width: 48px;
+    }
+
+    .bottom-nav a.active,
+    .bottom-nav a:hover {
+        color: var(--primary, #6c63ff);
+    }
+
+    .bottom-nav a svg {
+        width: 22px;
+        height: 22px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+}
+
+/* Bottom nav hidden on desktop */
+.bottom-nav { display: none; }
