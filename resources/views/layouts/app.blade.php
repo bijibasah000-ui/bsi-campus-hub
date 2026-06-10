@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>BSI Campus Hub &mdash; @yield('title', 'Dashboard')</title>
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
     @stack('styles')
@@ -80,6 +81,17 @@
             <a href="{{ Auth::check() ? route('pojok.index') : route('login') }}" class="menu-item pojok {{ request()->routeIs('pojok.*') ? 'active' : '' }}">
                 <span class="mi-icon"><svg viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg></span>
                 <span class="mi-label">Pojok Jajan</span>
+            </a>
+
+            <a href="{{ Auth::check() ? route('reward.index') : route('login') }}" class="menu-item {{ request()->routeIs('reward.*') ? 'active' : '' }}" style="{{ request()->routeIs('reward.*') ? '' : '' }}">
+                <span class="mi-icon"><svg viewBox="0 0 24 24"><path d="M20 12v10H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></span>
+                <span class="mi-label">Pojok Reward
+                    @auth
+                    <span style="background:#f59e0b;color:#fff;font-size:9px;padding:1px 5px;border-radius:50px;margin-left:4px;font-weight:800;">
+                        {{ number_format(Auth::user()->poin, 0, ',', '.') }}
+                    </span>
+                    @endauth
+                </span>
             </a>
 
             <a href="{{ Auth::check() ? route('setting') : route('login') }}" class="menu-item {{ request()->routeIs('setting') ? 'active' : '' }}">
@@ -199,7 +211,11 @@
     </a>
     <a href="{{ Auth::check() ? route('pojok.index') : route('login') }}" class="{{ request()->routeIs('pojok.*') ? 'active' : '' }}">
         <svg viewBox="0 0 24 24"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
-        Pojok
+        Jajan
+    </a>
+    <a href="{{ Auth::check() ? route('reward.index') : route('login') }}" class="{{ request()->routeIs('reward.*') ? 'active' : '' }}">
+        <svg viewBox="0 0 24 24"><path d="M20 12v10H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+        Reward
     </a>
     <a href="{{ Auth::check() ? route('profile') : route('login') }}" class="{{ request()->routeIs('profile') ? 'active' : '' }}">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
