@@ -23,14 +23,18 @@ RUN mkdir -p storage/framework/sessions \
         bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# Buat startup script menggunakan printf agar newline benar-benar diproses
-RUN printf '#!/bin/sh\nset -e\n\
+# Buat startup script
+# PENTING: Tidak pakai set -e di level atas karena artisan commands butuh .env
+# yang tidak ada saat build time. Setiap command dijalankan independen.
+RUN printf '#!/bin/sh\n\
 \n\
 echo "=== [1/5] Clearing caches ==="\n\
-php artisan config:clear\n\
-php artisan cache:clear\n\
-php artisan route:clear\n\
-php artisan view:clear\n\
+# Jalankan dengan || true agar error tidak crash container\n\
+# (artisan mungkin komplain tentang config saat pertama boot)\n\
+php artisan config:clear  || true\n\
+php artisan cache:clear   || true\n\
+php artisan route:clear   || true\n\
+php artisan view:clear    || true\n\
 \n\
 echo "=== [2/5] Waiting for database connection ==="\n\
 MAX_TRIES=30\n\
@@ -38,7 +42,7 @@ TRIES=0\n\
 until php artisan migrate:status > /dev/null 2>&1; do\n\
     TRIES=$((TRIES+1))\n\
     if [ "$TRIES" -ge "$MAX_TRIES" ]; then\n\
-        echo "ERROR: Database not reachable after ${MAX_TRIES} attempts. Exiting."\n\
+        echo "ERROR: Database not reachable after ${MAX_TRIES} attempts."\n\
         exit 1\n\
     fi\n\
     echo "DB not ready yet (attempt $TRIES/$MAX_TRIES), retrying in 2s..."\n\
@@ -50,7 +54,7 @@ echo "=== [3/5] Running migrations ==="\n\
 php artisan migrate --force\n\
 \n\
 echo "=== [4/5] Creating storage symlink ==="\n\
-php artisan storage:link --force\n\
+php artisan storage:link --force || true\n\
 \n\
 echo "=== [5/5] Starting server on port ${PORT:-8000} ==="\n\
 exec php artisan serve --host=0.0.0.0 --port=${PORT:-8000}\n\
