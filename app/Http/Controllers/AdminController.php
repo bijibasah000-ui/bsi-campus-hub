@@ -116,8 +116,9 @@ class AdminController extends Controller
 
         $user->update($data);
 
+        $namaMahasiswa = $user->fresh()->name ?? $user->fresh()->username;
         return redirect()->route('admin.mahasiswa.index')
-            ->with('success', "Data mahasiswa {$user->name ?? $user->username} berhasil diperbarui.");
+            ->with('success', "Data mahasiswa {$namaMahasiswa} berhasil diperbarui.");
     }
 
     public function toggleBlacklist(User $user)
