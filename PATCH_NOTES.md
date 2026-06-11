@@ -1,47 +1,41 @@
-# Patch Notes - Pojok Jajan Upgrade
+# BSI Campus Hub — Patch Notes
 
-## Setelah Upload ke Server, Jalankan:
+## Fix Deploy v1.1 — 2026-06-11
 
-```bash
-# 1. Jalankan migration baru
-php artisan migrate
+### Bug Fixes (Railway / Production)
 
-# 2. Seed reward katalog
-php artisan db:seed --class=RewardSeeder
+#### [CRITICAL] Dockerfile — Startup crash saat DB belum siap
+- **Problem:** Startup script langsung menjalankan `php artisan migrate --force` dengan `set -e` aktif. Jika MySQL Railway belum siap, container exit → 502 Bad Gateway.
+- **Fix:** Ditambahkan retry loop (max 30 percobaan × 2 detik = 60 detik) yang menunggu DB benar-benar bisa diakses sebelum menjalankan migrate.
+- **File:** `Dockerfile`
 
-# 3. Buat storage symlink (fix gambar tidak muncul)
-php artisan storage:link
+#### [CRITICAL] Dockerfile — Storage symlink tidak dibuat
+- **Problem:** Foto profil, lapak, dan produk tidak bisa tampil karena `public/storage` symlink tidak pernah dibuat saat deployment.
+- **Fix:** Ditambahkan `php artisan storage:link --force` di startup script.
+- **File:** `Dockerfile`
 
-# 4. Buat folder storage yang dibutuhkan
-mkdir -p storage/app/public/lapak
-mkdir -p storage/app/public/produk
+#### [WARNING] AppServiceProvider — HTTPS tidak di-force untuk Railway
+- **Problem:** Railway adalah HTTPS reverse proxy. Tanpa `URL::forceScheme('https')`, asset URL bisa ter-generate sebagai `http://` → mixed content warning / asset tidak load.
+- **Fix:** Ditambahkan `URL::forceScheme('https')` di method `boot()` saat `APP_ENV=production`.
+- **File:** `app/Providers/AppServiceProvider.php`
 
-# 5. Clear cache
-php artisan cache:clear
-php artisan view:clear
-php artisan config:clear
-```
+#### [WARNING] KonselingController — SSL verification dimatikan
+- **Problem:** `Http::withoutVerifying()` digunakan untuk koneksi ke Groq API, yang tidak aman di production.
+- **Fix:** Diganti dengan `Http::timeout(30)`. PHP 8.3 CLI Docker image sudah memiliki CA certificates lengkap.
+- **File:** `app/Http/Controllers/KonselingController.php`
 
-## Yang Berubah:
+#### [INFO] routes/web.php — Route `/bimbingan` tidak terdaftar
+- **Problem:** `BimbinganController` dan view `bimbingan.index` sudah ada tapi tidak ada route-nya, sehingga halaman tidak bisa diakses.
+- **Fix:** Ditambahkan `Route::get('/bimbingan', ...)` di dalam grup middleware `auth`.
+- **File:** `routes/web.php`
 
-### Bug Fix
-- ✅ Gambar produk & lapak sekarang tampil dengan benar (onerror fallback emoji)
-- ✅ Chip lapak sekarang bisa diklik dan filter produk per lapak
-- ✅ Card produk bisa diklik dan buka modal detail
+---
 
-### Fitur Baru
-- ⭐ Sistem Poin: dapat 300 poin per item yang dibeli
-- ⭐ Rating bintang (1-5) per produk dengan komentar
-- 🎁 Menu baru: Pojok Reward di sidebar & bottom nav
-- 🎁 8 reward katalog (Netflix, Spotify, Pulsa, dll)
-- 🎁 Tukar poin dengan kode klaim unik
-- 📊 Riwayat poin & penukaran
-
-### Database Baru
-- `produk_ratings` - rating per user per produk
-- `poin_logs` - log semua aktivitas poin
-- `pesanans` - data pesanan produk  
-- `rewards` - katalog reward
-- `penukarans` - riwayat penukaran reward
-- Kolom `poin` di tabel `users`
-- Kolom `rating_avg`, `rating_count` di tabel `produks`
+## Release v1.0 — Initial Release
+- Auth mahasiswa (register/login/logout)
+- Dashboard & event kampus
+- Pojok Jajan (lapak, produk, order, rating)
+- Pojok Reward (tukar poin)
+- Konseling AI dengan Kak Sari (Groq/LLaMA)
+- Course & Bimbingan
+- Admin panel (mahasiswa, lapak, produk)

@@ -9,6 +9,7 @@ use App\Http\Controllers\RewardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\BimbinganController; // FIX: route bimbingan sebelumnya tidak terdaftar
 
 /*
 |--------------------------------------------------------------------------
@@ -52,6 +53,10 @@ Route::middleware('auth')->group(function () {
     // Reward
     Route::get('/pojok-reward',                  [RewardController::class, 'index'])->name('reward.index');
     Route::post('/pojok-reward/{reward}/tukar',  [RewardController::class, 'tukar'])->name('reward.tukar');
+
+    // Bimbingan
+    // FIX: Route ini sebelumnya tidak terdaftar meskipun controller & view sudah ada
+    Route::get('/bimbingan', [BimbinganController::class, 'index'])->name('bimbingan.index');
 
     // Setting
     Route::get('/setting', [SettingController::class, 'index'])->name('setting');

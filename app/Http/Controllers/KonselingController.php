@@ -66,8 +66,9 @@ class KonselingController extends Controller
         try {
             Log::info('Mencoba koneksi ke Groq API...');
 
-            $response = Http::withoutVerifying()
-                ->timeout(30)
+            // FIX: Hapus withoutVerifying() - PHP 8.3 CLI image sudah punya CA certs lengkap.
+            // Tidak perlu mematikan SSL verification di production (Railway).
+            $response = Http::timeout(30)
                 ->withHeaders([
                     'Authorization' => 'Bearer ' . $apiKey,
                     'Content-Type'  => 'application/json',
