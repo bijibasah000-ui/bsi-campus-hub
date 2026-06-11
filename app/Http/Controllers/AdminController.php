@@ -6,10 +6,10 @@ use App\Models\User;
 use App\Models\Lapak;
 use App\Models\Produk;
 use App\Models\Order;
-use App\Models\Poin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 
 class AdminController extends Controller
@@ -79,6 +79,7 @@ class AdminController extends Controller
         if ($request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('name', 'like', "%{$request->search}%")
+                  ->orWhere('username', 'like', "%{$request->search}%")
                   ->orWhere('email', 'like', "%{$request->search}%")
                   ->orWhere('nim', 'like', "%{$request->search}%");
             });
@@ -90,20 +91,16 @@ class AdminController extends Controller
             $query->where('is_blacklisted', false);
         }
 
-        $mahasiswas = $query->with('poin')->paginate(20);
+        $mahasiswas = $query->paginate(20);
 
         return view('admin.mahasiswa.index', compact('mahasiswas'));
-    }
-
-    public function editMahasiswa(User $user)
-    {
-        return view('admin.mahasiswa.edit', compact('user'));
     }
 
     public function updateMahasiswa(Request $request, User $user)
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
+            'name'     => 'nullable|string|max:255',
+            'username' => 'required|string|max:255|unique:users,username,' . $user->id,
             'email'    => 'required|email|unique:users,email,' . $user->id,
             'nim'      => 'nullable|string|max:20',
             'semester' => 'nullable|string|max:5',
@@ -111,7 +108,7 @@ class AdminController extends Controller
             'password' => ['nullable', Password::min(8)],
         ]);
 
-        $data = $request->only(['name', 'email', 'nim', 'semester', 'prodi']);
+        $data = $request->only(['name', 'username', 'email', 'nim', 'semester', 'prodi']);
 
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
@@ -120,7 +117,7 @@ class AdminController extends Controller
         $user->update($data);
 
         return redirect()->route('admin.mahasiswa.index')
-            ->with('success', "Data mahasiswa {$user->name} berhasil diperbarui.");
+            ->with('success', "Data mahasiswa {$user->name ?? $user->username} berhasil diperbarui.");
     }
 
     public function toggleBlacklist(User $user)
@@ -132,11 +129,12 @@ class AdminController extends Controller
         $user->update(['is_blacklisted' => !$user->is_blacklisted]);
 
         $status = $user->is_blacklisted ? 'diblacklist' : 'diaktifkan kembali';
+        $nama   = $user->name ?? $user->username;
 
         return response()->json([
-            'success'      => true,
-            'blacklisted'  => $user->is_blacklisted,
-            'message'      => "Mahasiswa {$user->name} berhasil {$status}.",
+            'success'     => true,
+            'blacklisted' => $user->is_blacklisted,
+            'message'     => "Mahasiswa {$nama} berhasil {$status}.",
         ]);
     }
 
@@ -147,29 +145,28 @@ class AdminController extends Controller
             'alasan'      => 'required|string|max:255',
         ]);
 
-        Poin::updateOrCreate(
-            ['user_id' => $user->id],
-            ['jumlah_poin' => $request->jumlah_poin]
-        );
+        // Gunakan kolom poin langsung di users table (bukan model Poin terpisah)
+        $user->update(['poin' => $request->jumlah_poin]);
 
         return response()->json([
             'success' => true,
-            'message' => "Poin {$user->name} diperbarui menjadi {$request->jumlah_poin}.",
+            'message' => "Poin " . ($user->name ?? $user->username) . " diperbarui menjadi {$request->jumlah_poin}.",
         ]);
     }
 
     // ============================================================
-    // MANAJEMEN LAPAK — hapus duplikasi tag
+    // MANAJEMEN LAPAK
+    // BUG FIX: ganti 'nama_lapak' -> 'nama_toko' (sesuai kolom di DB)
     // ============================================================
     public function indexLapak(Request $request)
     {
         $lapaks = Lapak::with('user')
             ->withCount('produks')
-            ->when($request->search, fn($q) => $q->where('nama_lapak', 'like', "%{$request->search}%"))
+            ->when($request->search, fn($q) => $q->where('nama_toko', 'like', "%{$request->search}%"))
             ->paginate(20);
 
         // Deteksi duplikasi nama lapak (case-insensitive)
-        $duplikat = Lapak::selectRaw('LOWER(nama_lapak) as nama_lower, COUNT(*) as jumlah')
+        $duplikat = Lapak::selectRaw('LOWER(nama_toko) as nama_lower, COUNT(*) as jumlah')
             ->groupBy('nama_lower')
             ->having('jumlah', '>', 1)
             ->pluck('nama_lower')
@@ -180,8 +177,8 @@ class AdminController extends Controller
 
     public function deleteLapak(Lapak $lapak)
     {
-        $nama = $lapak->nama_lapak;
-        $lapak->delete(); // cascade ke produk jika ada
+        $nama = $lapak->nama_toko;
+        $lapak->delete();
 
         return response()->json([
             'success' => true,
@@ -189,17 +186,16 @@ class AdminController extends Controller
         ]);
     }
 
-    // Hapus semua duplikat, sisakan yang terlama
     public function hapusDuplikatLapak()
     {
-        $duplikats = Lapak::selectRaw('LOWER(nama_lapak) as nama_lower, MIN(id) as keep_id')
+        $duplikats = Lapak::selectRaw('LOWER(nama_toko) as nama_lower, MIN(id) as keep_id')
             ->groupBy('nama_lower')
-            ->having(\DB::raw('COUNT(*)'), '>', 1)
+            ->having(DB::raw('COUNT(*)'), '>', 1)
             ->get();
 
         $hapus = 0;
         foreach ($duplikats as $dup) {
-            $hapus += Lapak::whereRaw('LOWER(nama_lapak) = ?', [$dup->nama_lower])
+            $hapus += Lapak::whereRaw('LOWER(nama_toko) = ?', [$dup->nama_lower])
                 ->where('id', '!=', $dup->keep_id)
                 ->delete();
         }
@@ -212,11 +208,12 @@ class AdminController extends Controller
 
     // ============================================================
     // MANAJEMEN PRODUK
+    // BUG FIX: existing Produk uses 'nama_produk', patch used 'nama'
     // ============================================================
     public function indexProduk(Request $request)
     {
         $produks = Produk::with(['lapak.user'])
-            ->when($request->search, fn($q) => $q->where('nama', 'like', "%{$request->search}%"))
+            ->when($request->search, fn($q) => $q->where('nama_produk', 'like', "%{$request->search}%"))
             ->paginate(20);
 
         return view('admin.produk.index', compact('produks'));
@@ -224,7 +221,7 @@ class AdminController extends Controller
 
     public function deleteProduk(Produk $produk)
     {
-        $nama = $produk->nama;
+        $nama = $produk->nama_produk;
         $produk->delete();
 
         return response()->json([

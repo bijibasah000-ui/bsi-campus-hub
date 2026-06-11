@@ -23,7 +23,7 @@
                     Nama Lapak <span class="text-red-500">*</span>
                 </label>
                 <div class="relative">
-                    <input type="text" id="inputNamaLapak" name="nama_lapak"
+                    <input type="text" id="inputNamaLapak" name="nama_toko"
                         placeholder="Contoh: Warung Segar BSI"
                         class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 pr-10 transition"
                         oninput="debounceCheckNama(this.value)">
@@ -99,14 +99,14 @@ function debounceCheckNama(nilai) {
 
     namaCheckTimeout = setTimeout(async () => {
         try {
-            const res = await fetch('/pojok-jajan/check-nama-lapak', {
+            const res = await fetch('/pojok-jajan/check-nama-toko', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify({ nama_lapak: nilai.trim() }),
+                body: JSON.stringify({ nama_toko: nilai.trim() }),
             });
             const data = await res.json();
 

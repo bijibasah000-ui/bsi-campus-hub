@@ -6,21 +6,24 @@ use App\Models\Produk;
 use App\Models\ProdukRating;
 use App\Models\Pesanan;
 use App\Models\PoinLog;
+use App\Models\Order;
+use App\Models\Rating;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class PojokController extends Controller
 {
-    const POIN_PER_PEMBELIAN = 300; // poin per 1 qty pembelian
+    const POIN_PER_PEMBELIAN = 300;
 
     /* ── Index: tampilkan semua produk & lapak ── */
     public function index()
     {
-        $lapaks  = Lapak::where('status','aktif')->with('produks')->get();
-        $produks = Produk::where('status','tersedia')->with('lapak')->latest()->get();
+        $lapaks  = Lapak::where('status', 'aktif')->with('produks')->get();
+        $produks = Produk::where('status', 'tersedia')->with('lapak')->latest()->get();
         $myLapak = Auth::check() ? Auth::user()->lapak : null;
-        return view('pojok.index', compact('lapaks','produks','myLapak'));
+        return view('pojok.index', compact('lapaks', 'produks', 'myLapak'));
     }
 
     /* ── Form buka lapak ── */
@@ -42,22 +45,22 @@ class PojokController extends Controller
 
         $user  = Auth::user();
         $lapak = $user->lapak ?? new Lapak(['user_id' => $user->id]);
-        $data  = $request->only(['nama_toko','deskripsi_toko','kontak']);
+        $data  = $request->only(['nama_toko', 'deskripsi_toko', 'kontak']);
 
         if ($request->hasFile('foto_toko')) {
             if ($lapak->foto_toko) Storage::disk('public')->delete($lapak->foto_toko);
-            $data['foto_toko'] = $request->file('foto_toko')->store('lapak','public');
+            $data['foto_toko'] = $request->file('foto_toko')->store('lapak', 'public');
         }
 
         $lapak->fill($data)->save();
-        return redirect()->route('pojok.index')->with('success','Lapak berhasil disimpan!');
+        return redirect()->route('pojok.index')->with('success', 'Lapak berhasil disimpan!');
     }
 
     /* ── Form tambah produk ── */
     public function tambahProduk()
     {
         $lapak = Auth::user()->lapak;
-        if (!$lapak) return redirect()->route('pojok.buka-lapak')->with('error','Buat lapak dulu ya!');
+        if (!$lapak) return redirect()->route('pojok.buka-lapak')->with('error', 'Buat lapak dulu ya!');
         return view('pojok.tambah-produk', compact('lapak'));
     }
 
@@ -76,15 +79,15 @@ class PojokController extends Controller
         $lapak = Auth::user()->lapak;
         if (!$lapak) return redirect()->route('pojok.buka-lapak');
 
-        $data = $request->only(['nama_produk','jenis','harga','deskripsi','status']);
+        $data             = $request->only(['nama_produk', 'jenis', 'harga', 'deskripsi', 'status']);
         $data['lapak_id'] = $lapak->id;
 
         if ($request->hasFile('foto')) {
-            $data['foto'] = $request->file('foto')->store('produk','public');
+            $data['foto'] = $request->file('foto')->store('produk', 'public');
         }
 
         Produk::create($data);
-        return redirect()->route('pojok.index')->with('success','Produk berhasil ditambahkan!');
+        return redirect()->route('pojok.index')->with('success', 'Produk berhasil ditambahkan!');
     }
 
     /* ── Hapus produk ── */
@@ -93,15 +96,15 @@ class PojokController extends Controller
         if ($produk->lapak->user_id !== Auth::id()) abort(403);
         if ($produk->foto) Storage::disk('public')->delete($produk->foto);
         $produk->delete();
-        return back()->with('success','Produk dihapus.');
+        return back()->with('success', 'Produk dihapus.');
     }
 
     /* ── Detail produk (AJAX / modal) ── */
     public function detailProduk(Produk $produk)
     {
-        $produk->load('lapak','ratings.user');
+        $produk->load('lapak', 'ratings.user');
         $myRating = Auth::check()
-            ? ProdukRating::where('produk_id',$produk->id)->where('user_id',Auth::id())->first()
+            ? ProdukRating::where('produk_id', $produk->id)->where('user_id', Auth::id())->first()
             : null;
         return response()->json([
             'produk'    => $produk,
@@ -110,39 +113,32 @@ class PojokController extends Controller
         ]);
     }
 
-    /* ── Beri rating ── */
-    public function beriRating(Request $request, Produk $produk)
-    {
-        $request->validate([
-            'rating'   => 'required|integer|min:1|max:5',
-            'komentar' => 'nullable|string|max:300',
-        ]);
-
-        $existing = ProdukRating::where('produk_id',$produk->id)->where('user_id',Auth::id())->first();
-
-        if ($existing) {
-            $existing->update(['rating' => $request->rating, 'komentar' => $request->komentar]);
-        } else {
-            ProdukRating::create([
-                'produk_id' => $produk->id,
-                'user_id'   => Auth::id(),
-                'rating'    => $request->rating,
-                'komentar'  => $request->komentar,
-            ]);
-        }
-
-        // Recalculate avg
-        $avg = ProdukRating::where('produk_id',$produk->id)->avg('rating');
-        $cnt = ProdukRating::where('produk_id',$produk->id)->count();
-        $produk->update(['rating_avg' => round($avg,2), 'rating_count' => $cnt]);
-
-        return response()->json(['ok' => true, 'avg' => $avg, 'count' => $cnt]);
-    }
-
-    /* ── Pesan produk ── */
+    /* ── Pesan produk (PATCH FIX 1: cegah beli sendiri + metode pembayaran) ── */
     public function pesanProduk(Request $request, Produk $produk)
     {
-        $request->validate(['jumlah' => 'required|integer|min:1|max:99']);
+        $user = Auth::user();
+
+        // FIX 1: Cek blacklist
+        if ($user->is_blacklisted) {
+            return response()->json(['ok' => false, 'msg' => 'Akun Anda telah dinonaktifkan.'], 403);
+        }
+
+        // FIX 1: Penjual tidak bisa beli produk dari lapak sendiri
+        $lapakMilikUser = Lapak::where('user_id', $user->id)
+            ->where('id', $produk->lapak_id)
+            ->exists();
+
+        if ($lapakMilikUser) {
+            return response()->json([
+                'ok'  => false,
+                'msg' => 'Anda tidak dapat membeli produk dari lapak Anda sendiri.',
+            ], 403);
+        }
+
+        $request->validate([
+            'jumlah'            => 'required|integer|min:1|max:99',
+            'metode_pembayaran' => 'required|in:qris,tunai',
+        ]);
 
         if ($produk->status !== 'tersedia') {
             return response()->json(['ok' => false, 'msg' => 'Produk sudah habis.']);
@@ -151,34 +147,142 @@ class PojokController extends Controller
         $jumlah      = $request->jumlah;
         $totalHarga  = $produk->harga * $jumlah;
         $poinDidapat = self::POIN_PER_PEMBELIAN * $jumlah;
-        $user        = Auth::user();
 
-        // Buat pesanan
-        Pesanan::create([
-            'user_id'      => $user->id,
-            'produk_id'    => $produk->id,
-            'jumlah'       => $jumlah,
-            'total_harga'  => $totalHarga,
-            'poin_didapat' => $poinDidapat,
-            'status'       => 'pending',
-        ]);
+        DB::transaction(function () use ($request, $produk, $user, $jumlah, $totalHarga, $poinDidapat) {
+            // Buat order baru (dengan metode_pembayaran)
+            Order::create([
+                'user_id'           => $user->id,
+                'produk_id'         => $produk->id,
+                'jumlah'            => $jumlah,
+                'total_harga'       => $totalHarga,
+                'metode_pembayaran' => $request->metode_pembayaran,
+                'status'            => 'pending',
+            ]);
 
-        // Tambah poin
-        $user->increment('poin', $poinDidapat);
+            // Juga catat di pesanans (backward compat)
+            Pesanan::create([
+                'user_id'      => $user->id,
+                'produk_id'    => $produk->id,
+                'jumlah'       => $jumlah,
+                'total_harga'  => $totalHarga,
+                'poin_didapat' => $poinDidapat,
+                'status'       => 'pending',
+            ]);
 
-        // Log poin
-        PoinLog::create([
-            'user_id'    => $user->id,
-            'jumlah'     => $poinDidapat,
-            'keterangan' => 'Pembelian: '.$produk->nama_produk.' (x'.$jumlah.')',
-            'referensi'  => 'produk_'.$produk->id,
-            'tipe'       => 'pembelian',
-        ]);
+            // Tambah poin via kolom langsung di users
+            $user->increment('poin', $poinDidapat);
+
+            // Log poin
+            PoinLog::create([
+                'user_id'    => $user->id,
+                'jumlah'     => $poinDidapat,
+                'keterangan' => 'Pembelian: ' . $produk->nama_produk . ' (x' . $jumlah . ')',
+                'referensi'  => 'produk_' . $produk->id,
+                'tipe'       => 'pembelian',
+            ]);
+        });
 
         return response()->json([
             'ok'           => true,
             'poin_didapat' => $poinDidapat,
             'poin_total'   => $user->fresh()->poin,
+            'message'      => 'Pesanan berhasil dibuat! +' . $poinDidapat . ' poin.',
+        ]);
+    }
+
+    /* ── Beri rating (PATCH FIX 3: rating hanya setelah beli via Order) ── */
+    public function beriRating(Request $request, Produk $produk)
+    {
+        $user = Auth::user();
+
+        $request->validate([
+            'rating'   => 'required|integer|min:1|max:5',
+            'komentar' => 'nullable|string|max:300',
+            'order_id' => 'nullable|exists:orders,id',
+        ]);
+
+        // Jika ada order_id, pakai flow baru (order-verified)
+        if ($request->filled('order_id')) {
+            $order = Order::where('id', $request->order_id)
+                ->where('user_id', $user->id)
+                ->where('produk_id', $produk->id)
+                ->where('status', 'selesai')
+                ->first();
+
+            if (!$order) {
+                return response()->json([
+                    'ok'  => false,
+                    'msg' => 'Anda hanya dapat memberi rating setelah pesanan selesai.',
+                ], 403);
+            }
+
+            $sudahRating = Rating::where('user_id', $user->id)
+                ->where('produk_id', $produk->id)
+                ->where('order_id', $order->id)
+                ->exists();
+
+            if ($sudahRating) {
+                return response()->json(['ok' => false, 'msg' => 'Rating sudah diberikan untuk pesanan ini.'], 422);
+            }
+
+            Rating::create([
+                'user_id'   => $user->id,
+                'produk_id' => $produk->id,
+                'order_id'  => $order->id,
+                'bintang'   => $request->rating,
+                'komentar'  => $request->komentar,
+            ]);
+        } else {
+            // Fallback: flow lama pakai ProdukRating
+            $existing = ProdukRating::where('produk_id', $produk->id)->where('user_id', $user->id)->first();
+
+            if ($existing) {
+                $existing->update(['rating' => $request->rating, 'komentar' => $request->komentar]);
+            } else {
+                ProdukRating::create([
+                    'produk_id' => $produk->id,
+                    'user_id'   => $user->id,
+                    'rating'    => $request->rating,
+                    'komentar'  => $request->komentar,
+                ]);
+            }
+        }
+
+        // Recalculate avg dari ProdukRating (existing system)
+        $avg = ProdukRating::where('produk_id', $produk->id)->avg('rating');
+        $cnt = ProdukRating::where('produk_id', $produk->id)->count();
+        $produk->update(['rating_avg' => round($avg, 2), 'rating_count' => $cnt]);
+
+        return response()->json(['ok' => true, 'avg' => $avg, 'count' => $cnt]);
+    }
+
+    /* ── Ambil orders belum di-rating (untuk flow rating baru) ── */
+    public function getOrdersBelumDirating(Produk $produk)
+    {
+        $orders = Order::where('user_id', Auth::id())
+            ->where('produk_id', $produk->id)
+            ->where('status', 'selesai')
+            ->whereDoesntHave('rating')
+            ->get(['id', 'jumlah', 'created_at']);
+
+        return response()->json([
+            'orders'       => $orders,
+            'boleh_rating' => $orders->isNotEmpty(),
+        ]);
+    }
+
+    /* ── PATCH FIX 2: Cek nama lapak unik (AJAX) ── */
+    public function checkNamaToko(Request $request)
+    {
+        $nama = trim($request->nama_toko);
+
+        $exists = Lapak::whereRaw('LOWER(nama_toko) = ?', [strtolower($nama)])->exists();
+
+        return response()->json([
+            'available' => !$exists,
+            'message'   => $exists
+                ? "Nama lapak \"{$nama}\" sudah digunakan. Silakan pilih nama lain."
+                : "Nama lapak tersedia!",
         ]);
     }
 }

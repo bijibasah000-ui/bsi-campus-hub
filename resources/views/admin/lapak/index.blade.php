@@ -59,11 +59,11 @@
             <tbody class="divide-y divide-gray-50">
                 @forelse ($lapaks as $lapak)
                 <tr class="hover:bg-gray-50/50 transition
-                    {{ in_array(strtolower($lapak->nama_lapak), $duplikat) ? 'bg-red-50/40' : '' }}">
+                    {{ in_array(strtolower($lapak->nama_toko), $duplikat) ? 'bg-red-50/40' : '' }}">
                     <td class="px-4 py-3">
                         <div class="font-medium text-gray-800 flex items-center gap-2">
-                            {{ $lapak->nama_lapak }}
-                            @if(in_array(strtolower($lapak->nama_lapak), $duplikat))
+                            {{ $lapak->nama_toko }}
+                            @if(in_array(strtolower($lapak->nama_toko), $duplikat))
                                 <span class="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">duplikat</span>
                             @endif
                         </div>
@@ -74,7 +74,7 @@
                     </td>
                     <td class="px-4 py-3 text-center text-gray-600">{{ $lapak->produks_count }}</td>
                     <td class="px-4 py-3 text-right">
-                        <button onclick="hapusLapak({{ $lapak->id }}, '{{ addslashes($lapak->nama_lapak) }}')"
+                        <button onclick="hapusLapak({{ $lapak->id }}, '{{ addslashes($lapak->nama_toko) }}')"
                             class="text-red-500 hover:text-red-700 text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition">
                             Hapus
                         </button>
