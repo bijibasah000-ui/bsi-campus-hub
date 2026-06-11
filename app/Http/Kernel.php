@@ -64,5 +64,9 @@ class Kernel extends HttpKernel
         'signed' => \App\Http\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        
+        // KODE YANG BARU DITAMBAHKAN DI SINI:
+        'is_admin'        => \App\Http\Middleware\IsAdmin::class,
+        'check_blacklist' => \App\Http\Middleware\CheckBlacklist::class,
     ];
 }
