@@ -107,6 +107,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Mahasiswa
         Route::prefix('mahasiswa')->name('mahasiswa.')->group(function () {
             Route::get('/', [AdminController::class, 'indexMahasiswa'])->name('index');
+            Route::get('/{user}/edit', [AdminController::class, 'editMahasiswa'])->name('edit');
             Route::put('/{user}', [AdminController::class, 'updateMahasiswa'])->name('update');
             Route::post('/{user}/blacklist', [AdminController::class, 'toggleBlacklist'])->name('blacklist');
             Route::post('/{user}/poin', [AdminController::class, 'updatePoin'])->name('poin');
