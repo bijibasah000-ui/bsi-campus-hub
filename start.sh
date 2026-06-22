@@ -7,6 +7,7 @@ php artisan cache:clear   || true
 php artisan route:clear   || true
 php artisan view:clear    || true
 
+# v2
 echo "=== [2/5] Waiting for database connection ==="
 MAX_TRIES=30
 TRIES=0
