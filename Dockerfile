@@ -23,10 +23,8 @@ RUN mkdir -p storage/framework/sessions \
         bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# Tulis startup script sebagai file terpisah agar lebih mudah dibaca
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 EXPOSE 8000
-
 CMD ["/bin/sh", "/start.sh"]
