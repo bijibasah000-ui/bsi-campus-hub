@@ -96,6 +96,11 @@ class AdminController extends Controller
         return view('admin.mahasiswa.index', compact('mahasiswas'));
     }
 
+    public function editMahasiswa(User $user)
+    {
+        return view('admin.mahasiswa.edit', compact('user'));
+    }
+
     public function updateMahasiswa(Request $request, User $user)
     {
         $request->validate([
