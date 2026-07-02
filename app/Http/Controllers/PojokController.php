@@ -137,25 +137,27 @@ class PojokController extends Controller
 
         $request->validate([
             'jumlah'            => 'required|integer|min:1|max:99',
-            'metode_pembayaran' => 'required|in:qris,tunai',
+            'metode_pembayaran' => 'nullable|in:qris,tunai',
         ]);
 
         if ($produk->status !== 'tersedia') {
             return response()->json(['ok' => false, 'msg' => 'Produk sudah habis.']);
         }
 
-        $jumlah      = $request->jumlah;
-        $totalHarga  = $produk->harga * $jumlah;
-        $poinDidapat = self::POIN_PER_PEMBELIAN * $jumlah;
+        $jumlah            = $request->jumlah;
+        $totalHarga        = $produk->harga * $jumlah;
+        $poinDidapat       = self::POIN_PER_PEMBELIAN * $jumlah;
+        // Fallback aman: kalau UI tidak mengirim metode (mis. gagal load JS), default ke 'tunai'
+        $metodePembayaran  = $request->input('metode_pembayaran', 'tunai');
 
-        DB::transaction(function () use ($request, $produk, $user, $jumlah, $totalHarga, $poinDidapat) {
+        DB::transaction(function () use ($request, $produk, $user, $jumlah, $totalHarga, $poinDidapat, $metodePembayaran) {
             // Buat order baru (dengan metode_pembayaran)
             Order::create([
                 'user_id'           => $user->id,
                 'produk_id'         => $produk->id,
                 'jumlah'            => $jumlah,
                 'total_harga'       => $totalHarga,
-                'metode_pembayaran' => $request->metode_pembayaran,
+                'metode_pembayaran' => $metodePembayaran,
                 'status'            => 'pending',
             ]);
 

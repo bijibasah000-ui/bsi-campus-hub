@@ -148,13 +148,40 @@
                 {{-- Jumlah & pesan --}}
                 <div id="sectionPesan" style="margin-bottom:16px;">
                     <label style="font-size:12px;font-weight:600;color:var(--text);display:block;margin-bottom:6px;">Jumlah Pesanan</label>
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
                         <button onclick="ubahJumlah(-1)" style="width:34px;height:34px;border-radius:8px;border:1.5px solid #d1d5db;background:#fff;font-size:18px;cursor:pointer;font-weight:700;">−</button>
                         <input id="inputJumlah" type="number" value="1" min="1" max="99"
                                style="width:60px;text-align:center;border:1.5px solid #d1d5db;border-radius:8px;padding:6px;font-size:14px;font-weight:700;">
                         <button onclick="ubahJumlah(1)" style="width:34px;height:34px;border-radius:8px;border:1.5px solid #d1d5db;background:#fff;font-size:18px;cursor:pointer;font-weight:700;">+</button>
                         <span id="totalPoin" style="font-size:12px;color:#f59e0b;font-weight:700;">= 300 poin</span>
                     </div>
+
+                    {{-- Metode Pembayaran (tampilan saja / gimik) --}}
+                    <label style="font-size:12px;font-weight:600;color:var(--text);display:block;margin-bottom:8px;">Metode Pembayaran</label>
+                    <div id="metodeBayarWrap" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+                        <div class="opsi-bayar active" data-underlying="qris" onclick="pilihMetodeBayar(this)"
+                             style="display:flex;align-items:center;gap:8px;border:1.5px solid #6d28d9;background:#f5f3ff;border-radius:10px;padding:8px 10px;cursor:pointer;transition:.15s;">
+                            <span style="width:26px;height:26px;border-radius:6px;background:#00AA13;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">GP</span>
+                            <span style="font-size:12px;font-weight:700;color:var(--text);">GoPay</span>
+                        </div>
+                        <div class="opsi-bayar" data-underlying="qris" onclick="pilihMetodeBayar(this)"
+                             style="display:flex;align-items:center;gap:8px;border:1.5px solid #d1d5db;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;transition:.15s;">
+                            <span style="width:26px;height:26px;border-radius:6px;background:#118EEA;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">D</span>
+                            <span style="font-size:12px;font-weight:700;color:var(--text);">DANA</span>
+                        </div>
+                        <div class="opsi-bayar" data-underlying="tunai" onclick="pilihMetodeBayar(this)"
+                             style="display:flex;align-items:center;gap:8px;border:1.5px solid #d1d5db;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;transition:.15s;">
+                            <span style="width:26px;height:26px;border-radius:6px;background:#00529C;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">BCA</span>
+                            <span style="font-size:12px;font-weight:700;color:var(--text);">BCA</span>
+                        </div>
+                        <div class="opsi-bayar" data-underlying="tunai" onclick="pilihMetodeBayar(this)"
+                             style="display:flex;align-items:center;gap:8px;border:1.5px solid #d1d5db;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;transition:.15s;">
+                            <span style="width:26px;height:26px;border-radius:6px;background:#00529C;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">BRI</span>
+                            <span style="font-size:12px;font-weight:700;color:var(--text);">BRI</span>
+                        </div>
+                    </div>
+                    <input type="hidden" id="inputMetodeBayar" value="qris">
+
                     <button id="btnPesan" onclick="pesanProduk()" class="btn-primary" style="width:100%;margin-bottom:0;">
                         🛒 Pesan Sekarang
                     </button>
@@ -306,6 +333,9 @@ function bukaDetailProduk(id) {
         // Jumlah
         document.getElementById('inputJumlah').value = 1;
         updateTotalPoin();
+        // Reset metode pembayaran ke default (opsi pertama)
+        var opsiBayar = document.querySelectorAll('#metodeBayarWrap .opsi-bayar');
+        if (opsiBayar.length) pilihMetodeBayar(opsiBayar[0]);
 
         document.getElementById('modalLoading').style.display = 'none';
         document.getElementById('modalContent').style.display = '';
@@ -415,8 +445,21 @@ function updateTotalPoin() {
     document.getElementById('totalPoin').textContent = '= '+(qty*300).toLocaleString('id-ID')+' poin';
 }
 
+function pilihMetodeBayar(el) {
+    document.querySelectorAll('#metodeBayarWrap .opsi-bayar').forEach(function(opt) {
+        opt.classList.remove('active');
+        opt.style.border = '1.5px solid #d1d5db';
+        opt.style.background = '#fff';
+    });
+    el.classList.add('active');
+    el.style.border = '1.5px solid #6d28d9';
+    el.style.background = '#f5f3ff';
+    document.getElementById('inputMetodeBayar').value = el.dataset.underlying;
+}
+
 function pesanProduk() {
     var jumlah = parseInt(document.getElementById('inputJumlah').value || 1);
+    var metodeBayar = document.getElementById('inputMetodeBayar').value || 'qris';
     var btn    = document.getElementById('btnPesan');
     btn.disabled = true; btn.textContent = '⏳ Memproses...';
     var csrfToken = document.querySelector('meta[name="csrf-token"]');
@@ -425,7 +468,7 @@ function pesanProduk() {
     fetch('/pojok-jajan/produk/'+_currentProdukId+'/pesan', {
         method: 'POST',
         headers: {'Content-Type':'application/json','X-CSRF-TOKEN': csrf,'X-Requested-With':'XMLHttpRequest'},
-        body: JSON.stringify({ jumlah: jumlah })
+        body: JSON.stringify({ jumlah: jumlah, metode_pembayaran: metodeBayar })
     })
     .then(r => r.json())
     .then(function(d) {
