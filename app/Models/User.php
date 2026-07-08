@@ -30,4 +30,11 @@ class User extends Authenticatable
     public function penukarans() { return $this->hasMany(Penukaran::class); }
     // === PATCH: New relations ===
     public function orders()     { return $this->hasMany(Order::class); }
+    public function lapakPengajuans() { return $this->hasMany(LapakPengajuan::class); }
+
+    /** Pengajuan lapak paling baru milik user ini (untuk cek status pending/ditolak) */
+    public function pengajuanLapakTerbaru()
+    {
+        return $this->hasOne(LapakPengajuan::class)->latestOfMany();
+    }
 }

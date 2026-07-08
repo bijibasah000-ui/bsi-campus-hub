@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Lapak;
+use App\Models\LapakPengajuan;
 use App\Models\Produk;
 use App\Models\Order;
 use Illuminate\Http\Request;
@@ -65,6 +66,7 @@ class AdminController extends Controller
             'total_order'     => Order::count(),
             'total_produk'    => Produk::count(),
             'blacklisted'     => User::where('is_blacklisted', true)->count(),
+            'pengajuan_lapak_pending' => LapakPengajuan::where('status', 'pending')->count(),
         ];
         return view('admin.dashboard', compact('stats'));
     }
@@ -178,7 +180,74 @@ class AdminController extends Controller
             ->pluck('nama_lower')
             ->toArray();
 
-        return view('admin.lapak.index', compact('lapaks', 'duplikat'));
+        // Permintaan pembukaan lapak baru yang menunggu approval
+        $pengajuans = LapakPengajuan::with('user')
+            ->where('status', 'pending')
+            ->latest()
+            ->get();
+
+        $riwayatPengajuan = LapakPengajuan::with('user')
+            ->whereIn('status', ['disetujui', 'ditolak'])
+            ->latest()
+            ->take(20)
+            ->get();
+
+        return view('admin.lapak.index', compact('lapaks', 'duplikat', 'pengajuans', 'riwayatPengajuan'));
+    }
+
+    /* ── Setujui pengajuan buka lapak: buat record Lapak baru ── */
+    public function approvePengajuanLapak(LapakPengajuan $pengajuan)
+    {
+        if (!$pengajuan->isPending()) {
+            return response()->json(['success' => false, 'message' => 'Pengajuan ini sudah diproses sebelumnya.'], 422);
+        }
+
+        // Cegah nama_toko bentrok kalau ada lapak lain terlanjur pakai nama yang sama
+        $namaSudahDipakai = Lapak::whereRaw('LOWER(nama_toko) = ?', [strtolower($pengajuan->nama_toko)])->exists();
+        if ($namaSudahDipakai) {
+            return response()->json(['success' => false, 'message' => 'Nama lapak sudah dipakai lapak lain. Tolak pengajuan ini dan minta penjual ganti nama.'], 422);
+        }
+
+        $lapak = Lapak::create([
+            'user_id'        => $pengajuan->user_id,
+            'nama_toko'      => $pengajuan->nama_toko,
+            'deskripsi_toko' => $pengajuan->deskripsi_toko,
+            'foto_toko'      => $pengajuan->foto_toko,
+            'kontak'         => $pengajuan->kontak,
+            'kategori'       => $pengajuan->kategori,
+            'status'         => 'aktif',
+        ]);
+
+        $pengajuan->update([
+            'status'       => 'disetujui',
+            'lapak_id'     => $lapak->id,
+            'disetujui_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Lapak \"{$lapak->nama_toko}\" disetujui dan sudah tayang di Pojok Jajan.",
+        ]);
+    }
+
+    /* ── Tolak pengajuan buka lapak ── */
+    public function rejectPengajuanLapak(Request $request, LapakPengajuan $pengajuan)
+    {
+        if (!$pengajuan->isPending()) {
+            return response()->json(['success' => false, 'message' => 'Pengajuan ini sudah diproses sebelumnya.'], 422);
+        }
+
+        $request->validate(['catatan_admin' => 'nullable|string|max:255']);
+
+        $pengajuan->update([
+            'status'        => 'ditolak',
+            'catatan_admin' => $request->catatan_admin ?: 'Ditolak oleh admin.',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Pengajuan lapak \"{$pengajuan->nama_toko}\" ditolak.",
+        ]);
     }
 
     public function deleteLapak(Lapak $lapak)

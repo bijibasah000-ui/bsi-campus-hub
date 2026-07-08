@@ -70,6 +70,8 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'check_blacklist'])->group(function () {
     Route::get('/pojok-jajan', [PojokController::class, 'index'])->name('pojok.index');
     Route::get('/pojok-jajan/buka-lapak', [PojokController::class, 'bukaLapak'])->name('pojok.buka-lapak');
+    Route::post('/pojok-jajan/buka-lapak/ajukan', [PojokController::class, 'ajukanLapak'])->name('pojok.ajukan-lapak');
+    Route::post('/pojok-jajan/buka-lapak/pengajuan/{pengajuan}/batal', [PojokController::class, 'batalkanPengajuanLapak'])->name('pojok.batal-pengajuan-lapak');
     Route::post('/pojok-jajan/buka-lapak', [PojokController::class, 'simpanLapak'])->name('pojok.simpan-lapak');
     Route::get('/pojok-jajan/tambah-produk', [PojokController::class, 'tambahProduk'])->name('pojok.tambah-produk');
     Route::post('/pojok-jajan/tambah-produk', [PojokController::class, 'simpanProduk'])->name('pojok.simpan-produk');
@@ -118,6 +120,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/', [AdminController::class, 'indexLapak'])->name('index');
             Route::delete('/{lapak}', [AdminController::class, 'deleteLapak'])->name('delete');
             Route::post('/hapus-duplikat', [AdminController::class, 'hapusDuplikatLapak'])->name('hapus-duplikat');
+
+            // Permintaan pembukaan lapak baru (approval)
+            Route::post('/pengajuan/{pengajuan}/approve', [AdminController::class, 'approvePengajuanLapak'])->name('pengajuan.approve');
+            Route::post('/pengajuan/{pengajuan}/reject', [AdminController::class, 'rejectPengajuanLapak'])->name('pengajuan.reject');
         });
 
         // Produk

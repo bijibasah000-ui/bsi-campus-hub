@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lapak;
+use App\Models\LapakPengajuan;
 use App\Models\Produk;
 use App\Models\ProdukRating;
 use App\Models\Pesanan;
@@ -23,29 +24,111 @@ class PojokController extends Controller
         $lapaks  = Lapak::where('status', 'aktif')->with('produks')->get();
         $produks = Produk::where('status', 'tersedia')->with('lapak')->latest()->get();
         $myLapak = Auth::check() ? Auth::user()->lapak : null;
-        return view('pojok.index', compact('lapaks', 'produks', 'myLapak'));
+        $myPengajuan = (Auth::check() && !$myLapak)
+            ? LapakPengajuan::where('user_id', Auth::id())->latest()->first()
+            : null;
+        return view('pojok.index', compact('lapaks', 'produks', 'myLapak', 'myPengajuan'));
     }
 
-    /* ── Form buka lapak ── */
+    /* ── Form buka lapak (kini berupa pengajuan + pembayaran, butuh approval admin) ── */
     public function bukaLapak()
     {
-        $myLapak = Auth::user()->lapak;
-        return view('pojok.buka-lapak', compact('myLapak'));
+        $user  = Auth::user();
+        $myLapak = $user->lapak;
+
+        // Kalau sudah punya lapak aktif, tetap tampilkan halaman kelola (edit info + produk) seperti biasa
+        if ($myLapak) {
+            return view('pojok.buka-lapak', [
+                'myLapak'    => $myLapak,
+                'pengajuan'  => null,
+                'paketHarga' => LapakPengajuan::PAKET_HARGA,
+            ]);
+        }
+
+        // Kalau belum punya lapak, cek status pengajuan terakhir
+        $pengajuan = LapakPengajuan::where('user_id', $user->id)->latest()->first();
+
+        return view('pojok.buka-lapak', [
+            'myLapak'   => null,
+            'pengajuan' => $pengajuan, // null = belum pernah ajukan, pending/ditolak/disetujui sesuai status
+            'paketHarga' => LapakPengajuan::PAKET_HARGA,
+        ]);
     }
 
-    /* ── Simpan / update lapak ── */
+    /* ── Simpan pengajuan buka lapak baru (butuh approval admin + pembayaran) ── */
+    public function ajukanLapak(Request $request)
+    {
+        $user = Auth::user();
+
+        // Safety: kalau sudah punya lapak aktif atau pengajuan pending, jangan bisa ajukan lagi
+        if ($user->lapak) {
+            return redirect()->route('pojok.buka-lapak')->with('error', 'Kamu sudah punya lapak aktif.');
+        }
+        $pengajuanAktif = LapakPengajuan::where('user_id', $user->id)->where('status', 'pending')->exists();
+        if ($pengajuanAktif) {
+            return redirect()->route('pojok.buka-lapak')->with('error', 'Kamu masih punya pengajuan yang sedang menunggu approval admin.');
+        }
+
+        $request->validate([
+            'nama_toko'         => 'required|string|max:100|unique:lapaks,nama_toko',
+            'deskripsi_toko'    => 'nullable|string|max:500',
+            'kontak'            => 'nullable|string|max:20',
+            'foto_toko'         => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'durasi_bulan'      => 'required|integer|min:1|max:6',
+            'metode_pembayaran' => 'required|in:qris,tunai',
+        ]);
+
+        $paket = LapakPengajuan::PAKET_HARGA;
+        $durasi = (int) $request->durasi_bulan;
+        $harga  = $paket[$durasi] ?? $paket[1];
+
+        $data = $request->only(['nama_toko', 'deskripsi_toko', 'kontak']);
+        if ($request->hasFile('foto_toko')) {
+            $data['foto_toko'] = $request->file('foto_toko')->store('lapak', 'public');
+        }
+
+        LapakPengajuan::create(array_merge($data, [
+            'user_id'           => $user->id,
+            'durasi_bulan'      => $durasi,
+            'harga'             => $harga,
+            'metode_pembayaran' => $request->metode_pembayaran,
+            'status'            => 'pending',
+        ]));
+
+        return redirect()->route('pojok.buka-lapak')
+            ->with('success', 'Permintaan pembukaan lapak berhasil diajukan! Menunggu persetujuan admin ya.');
+    }
+
+    /* ── Batalkan pengajuan yang masih pending ── */
+    public function batalkanPengajuanLapak(LapakPengajuan $pengajuan)
+    {
+        if ($pengajuan->user_id !== Auth::id()) abort(403);
+        if (!$pengajuan->isPending()) {
+            return redirect()->route('pojok.buka-lapak')->with('error', 'Pengajuan ini sudah tidak bisa dibatalkan.');
+        }
+        $pengajuan->delete();
+        return redirect()->route('pojok.buka-lapak')->with('success', 'Pengajuan dibatalkan.');
+    }
+
+    /* ── Update info lapak yang SUDAH disetujui (tidak butuh approval ulang) ── */
     public function simpanLapak(Request $request)
     {
+        $user  = Auth::user();
+        $lapak = $user->lapak;
+
+        // Buka lapak baru sudah tidak lewat sini lagi — wajib lewat alur pengajuan (ajukanLapak)
+        if (!$lapak) {
+            return redirect()->route('pojok.buka-lapak')->with('error', 'Silakan ajukan pembukaan lapak terlebih dahulu.');
+        }
+
         $request->validate([
-            'nama_toko'      => 'required|string|max:100',
+            'nama_toko'      => 'required|string|max:100|unique:lapaks,nama_toko,' . $lapak->id,
             'deskripsi_toko' => 'nullable|string|max:500',
             'kontak'         => 'nullable|string|max:20',
             'foto_toko'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        $user  = Auth::user();
-        $lapak = $user->lapak ?? new Lapak(['user_id' => $user->id]);
-        $data  = $request->only(['nama_toko', 'deskripsi_toko', 'kontak']);
+        $data = $request->only(['nama_toko', 'deskripsi_toko', 'kontak']);
 
         if ($request->hasFile('foto_toko')) {
             if ($lapak->foto_toko) Storage::disk('public')->delete($lapak->foto_toko);
@@ -137,25 +220,27 @@ class PojokController extends Controller
 
         $request->validate([
             'jumlah'            => 'required|integer|min:1|max:99',
-            'metode_pembayaran' => 'required|in:qris,tunai',
+            'metode_pembayaran' => 'nullable|in:qris,tunai',
         ]);
 
         if ($produk->status !== 'tersedia') {
             return response()->json(['ok' => false, 'msg' => 'Produk sudah habis.']);
         }
 
-        $jumlah      = $request->jumlah;
-        $totalHarga  = $produk->harga * $jumlah;
-        $poinDidapat = self::POIN_PER_PEMBELIAN * $jumlah;
+        $jumlah            = $request->jumlah;
+        $totalHarga        = $produk->harga * $jumlah;
+        $poinDidapat       = self::POIN_PER_PEMBELIAN * $jumlah;
+        // Fallback aman: kalau UI tidak mengirim metode (mis. gagal load JS), default ke 'tunai'
+        $metodePembayaran  = $request->input('metode_pembayaran', 'tunai');
 
-        DB::transaction(function () use ($request, $produk, $user, $jumlah, $totalHarga, $poinDidapat) {
+        DB::transaction(function () use ($request, $produk, $user, $jumlah, $totalHarga, $poinDidapat, $metodePembayaran) {
             // Buat order baru (dengan metode_pembayaran)
             Order::create([
                 'user_id'           => $user->id,
                 'produk_id'         => $produk->id,
                 'jumlah'            => $jumlah,
                 'total_harga'       => $totalHarga,
-                'metode_pembayaran' => $request->metode_pembayaran,
+                'metode_pembayaran' => $metodePembayaran,
                 'status'            => 'pending',
             ]);
 
